@@ -1,65 +1,87 @@
 const express = require('express');
 const twilio = require('twilio');
-const router = express.Router();
 
-// Access the credentials you saved in Railway
-const twilioAccountSid = process.env.TWILIO_ACCOUNT_SID;
-const twilioApiKey = process.env.TWILIO_API_KEY;
-const twilioApiSecret = process.env.TWILIO_API_SECRET;
-const twimlAppSid = process.env.TWIML_APP_SID;
-const inboundPhoneNumber = process.env.INBOUND_PHONE_NUMBER;
+const router = express.Router();
 
 const AccessToken = twilio.jwt.AccessToken;
 const VoiceGrant = AccessToken.VoiceGrant;
 
-/**
- * GET /api/twilio-token
- * This generates the security token that allows your website widget to start a call.
- */
 router.get('/twilio-token', (req, res) => {
   try {
-    const identity = 'user_' + Math.random().toString(36).substring(7);
-    
+    const requiredVars = [
+      'TWILIO_ACCOUNT_SID',
+      'TWILIO_API_KEY',
+      'TWILIO_API_SECRET',
+      'TWIML_APP_SID',
+      'INBOUND_PHONE_NUMBER'
+    ];
+
+    const missingVars = requiredVars.filter((key) => !process.env[key]);
+
+    if (missingVars.length > 0) {
+      return res.status(500).json({
+        error: 'Missing required Railway variables',
+        missing: missingVars
+      });
+    }
+
+    const identity = `user_${Date.now()}`;
+
     const token = new AccessToken(
-      twilioAccountSid,
-      twilioApiKey,
-      twilioApiSecret,
-      { identity: identity }
+      process.env.TWILIO_ACCOUNT_SID,
+      process.env.TWILIO_API_KEY,
+      process.env.TWILIO_API_SECRET,
+      { identity }
     );
 
-    const grant = new VoiceGrant({
-      outgoingApplicationSid: twimlAppSid,
-      incomingAllow: true,
+    const voiceGrant = new VoiceGrant({
+      outgoingApplicationSid: process.env.TWIML_APP_SID,
+      incomingAllow: true
     });
 
-    token.addGrant(grant);
+    token.addGrant(voiceGrant);
 
-    res.json({ 
-      identity: identity,
-      token: token.toJwt() 
+    res.json({
+      token: token.toJwt(),
+      identity
     });
   } catch (error) {
-    console.error('Error generating token:', error);
-    res.status(500).json({ error: 'Failed to generate token' });
+    console.error('Token generation failed:', error);
+
+    res.status(500).json({
+      error: 'Token generation failed',
+      details: error.message
+    });
   }
 });
 
-/**
- * POST /api/twiml/handle-call
- * This tells Twilio exactly what to do (dial Michelle) once the call starts.
- */
 router.post('/twiml/handle-call', (req, res) => {
-  const twiml = new twilio.twiml.VoiceResponse();
-  
-  // Optional: A quick greeting
-  twiml.say('Connecting you to Michelle.');
-  twiml.pause({ length: 1 });
+  try {
+    const twiml = new twilio.twiml.VoiceResponse();
 
-  // Dial your SimpleTalk-connected phone number
-  twiml.dial(inboundPhoneNumber);
+    twiml.say('Connecting you to Michelle.');
+    twiml.dial(process.env.INBOUND_PHONE_NUMBER);
 
-  res.type('text/xml');
-  res.send(twiml.toString());
+    res.type('text/xml');
+    res.send(twiml.toString());
+  } catch (error) {
+    console.error('TwiML generation failed:', error);
+
+    res.status(500).json({
+      error: 'TwiML generation failed',
+      details: error.message
+    });
+  }
+});
+
+router.post('/webhooks/recording-status', (req, res) => {
+  console.log('Recording status webhook:', req.body);
+  res.sendStatus(200);
+});
+
+router.post('/webhooks/call-status', (req, res) => {
+  console.log('Call status webhook:', req.body);
+  res.sendStatus(200);
 });
 
 module.exports = router;
