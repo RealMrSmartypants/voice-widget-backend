@@ -2,37 +2,64 @@ const express = require('express');
 const twilio = require('twilio');
 const router = express.Router();
 
+// Access the credentials you saved in Railway
 const twilioAccountSid = process.env.TWILIO_ACCOUNT_SID;
-const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
-const twilioClient = twilio(twilioAccountSid, twilioAuthToken);
+const twilioApiKey = process.env.TWILIO_API_KEY;
+const twilioApiSecret = process.env.TWILIO_API_SECRET;
+const twimlAppSid = process.env.TWIML_APP_SID;
+const inboundPhoneNumber = process.env.INBOUND_PHONE_NUMBER;
 
-const CONFIG = {
-  inboundPhoneNumber: process.env.INBOUND_PHONE_NUMBER,
-  apiKey: process.env.TWILIO_API_KEY,
-  apiSecret: process.env.TWILIO_API_SECRET,
-};
+const AccessToken = twilio.jwt.AccessToken;
+const VoiceGrant = AccessToken.VoiceGrant;
 
-// This handles the call when Twilio starts the connection
+/**
+ * GET /api/twilio-token
+ * This generates the security token that allows your website widget to start a call.
+ */
+router.get('/twilio-token', (req, res) => {
+  try {
+    const identity = 'user_' + Math.random().toString(36).substring(7);
+    
+    const token = new AccessToken(
+      twilioAccountSid,
+      twilioApiKey,
+      twilioApiSecret,
+      { identity: identity }
+    );
+
+    const grant = new VoiceGrant({
+      outgoingApplicationSid: twimlAppSid,
+      incomingAllow: true,
+    });
+
+    token.addGrant(grant);
+
+    res.json({ 
+      identity: identity,
+      token: token.toJwt() 
+    });
+  } catch (error) {
+    console.error('Error generating token:', error);
+    res.status(500).json({ error: 'Failed to generate token' });
+  }
+});
+
+/**
+ * POST /api/twiml/handle-call
+ * This tells Twilio exactly what to do (dial Michelle) once the call starts.
+ */
 router.post('/twiml/handle-call', (req, res) => {
   const twiml = new twilio.twiml.VoiceResponse();
   
-  // Optional greeting before connecting to the AI
-  twiml.say('Connecting you to the AI Assistant. Please wait.');
+  // Optional: A quick greeting
+  twiml.say('Connecting you to Michelle.');
   twiml.pause({ length: 1 });
 
-  // Connect the user directly to your SimpleTalk agent's number
-  twiml.dial(CONFIG.inboundPhoneNumber);
-
-  // Fallback if the connection fails
-  twiml.say('We were unable to connect your call. Please try again later.');
+  // Dial your SimpleTalk-connected phone number
+  twiml.dial(inboundPhoneNumber);
 
   res.type('text/xml');
   res.send(twiml.toString());
-});
-
-// Endpoint for call status updates
-router.post('/webhooks/call-status', (req, res) => {
-  res.sendStatus(200);
 });
 
 module.exports = router;
