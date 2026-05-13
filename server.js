@@ -1,35 +1,29 @@
 const express = require('express');
-const cors = require('cors');
-const bodyParser = require('body-parser');
-require('dotenv').config();
+const twilio = require('twilio');
+const router = express.Router();
 
-const app = express();
+// ... (Keep your variable declarations)
 
-// Middleware setup to allow your GHL website to talk to this server
-app.use(cors({
-  origin: '*', 
-  credentials: true,
-}));
-
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(bodyParser.json());
-
-// Import the Twilio logic from the routes folder
-const twilioRoutes = require('./routes/twilio');
-app.use('/api', twilioRoutes);
-
-// Simple health check to see if the server is alive
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok' });
+/**
+ * GET /api/twilio-token 
+ * (Mapped correctly because server.js uses app.use('/api', twilioRoutes))
+ */
+router.get('/twilio-token', (req, res) => {
+  // ... (Keep token generation logic)
 });
 
-// Error handling
-app.use((err, req, res, next) => {
-  console.error(err);
-  res.status(500).json({ error: 'Internal server error' });
+/**
+ * POST /api/twiml/handle-call
+ * (This must match what you enter in the Twilio Console)
+ */
+router.post('/twiml/handle-call', (req, res) => {
+  const twiml = new twilio.twiml.VoiceResponse();
+  twiml.say('Connecting you to Michelle.');
+  twiml.pause({ length: 1 });
+  twiml.dial(process.env.INBOUND_PHONE_NUMBER); 
+
+  res.type('text/xml');
+  res.send(twiml.toString());
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Twilio backend running on port ${PORT}`);
-});
+module.exports = router;
