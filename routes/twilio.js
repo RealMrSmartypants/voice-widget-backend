@@ -36,23 +36,3 @@ router.post('/twiml/handle-call', (req, res) => {
 });
 
 module.exports = router;
-3. Update server.js
-Ensure your server.js correctly references the updated twilio.js and allows CORS from your website
-:
-const express = require('express');
-const cors = require('cors');
-const bodyParser = require('body-parser');
-require('dotenv').config();
-
-const app = express();
-app.use(cors({ origin: '*' }));
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
-
-const twilioRoutes = require('./twilio'); // Matches filename twilio.js
-app.use('/api', twilioRoutes);
-
-const PORT = process.env.PORT || 8080;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
-});
