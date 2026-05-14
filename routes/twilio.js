@@ -1,6 +1,5 @@
 const express = require('express');
 const twilio = require('twilio');
-
 const router = express.Router();
 
 const AccessToken = twilio.jwt.AccessToken;
@@ -8,86 +7,52 @@ const VoiceGrant = AccessToken.VoiceGrant;
 
 router.get('/twilio-token', (req, res) => {
   try {
-    const requiredVars = [
-      'TWILIO_ACCOUNT_SID',
-      'TWILIO_API_KEY',
-      'TWILIO_API_SECRET',
-      'TWIML_APP_SID',
-      'INBOUND_PHONE_NUMBER'
-    ];
-
-    const missingVars = requiredVars.filter((key) => !process.env[key]);
-
-    if (missingVars.length > 0) {
-      return res.status(500).json({
-        error: 'Missing required Railway variables',
-        missing: missingVars
-      });
-    }
-
-    const identity = `user_${Date.now()}`;
-
+    const identity = 'user_' + Math.random().toString(36).substring(7);
     const token = new AccessToken(
       process.env.TWILIO_ACCOUNT_SID,
       process.env.TWILIO_API_KEY,
       process.env.TWILIO_API_SECRET,
-      { identity }
+      { identity: identity }
     );
 
-    const voiceGrant = new VoiceGrant({
+    const grant = new VoiceGrant({
       outgoingApplicationSid: process.env.TWIML_APP_SID,
-      incomingAllow: true
+      incomingAllow: true,
     });
 
-    token.addGrant(voiceGrant);
-
-    res.json({
-      token: token.toJwt(),
-      identity
-    });
+    token.addGrant(grant);
+    res.json({ token: token.toJwt() });
   } catch (error) {
-    console.error('Token generation failed:', error);
-
-    res.status(500).json({
-      error: 'Token generation failed',
-      details: error.message
-    });
+    res.status(500).json({ error: error.message });
   }
 });
 
 router.post('/twiml/handle-call', (req, res) => {
-  try {
-    const twiml = new twilio.twiml.VoiceResponse();
-
-    twiml.say('Connecting you to Michelle.');
-
-    const dial = twiml.dial({
-      timeout: 30,
-      record: 'record-from-answer'
-    });
-
-    dial.number(process.env.INBOUND_PHONE_NUMBER);
-
-    res.type('text/xml');
-    res.send(twiml.toString());
-  } catch (error) {
-    console.error('TwiML generation failed:', error);
-
-    res.status(500).json({
-      error: 'TwiML generation failed',
-      details: error.message
-    });
-  }
-});
-
-router.post('/webhooks/recording-status', (req, res) => {
-  console.log('Recording status webhook:', req.body);
-  res.sendStatus(200);
-});
-
-router.post('/webhooks/call-status', (req, res) => {
-  console.log('Call status webhook:', req.body);
-  res.sendStatus(200);
+  const twiml = new twilio.twiml.VoiceResponse();
+  twiml.say('Connecting you to Michelle.'); // Name: Michelle [6]
+  twiml.dial(process.env.INBOUND_PHONE_NUMBER); 
+  res.type('text/xml');
+  res.send(twiml.toString());
 });
 
 module.exports = router;
+3. Update server.js
+Ensure your server.js correctly references the updated twilio.js and allows CORS from your website
+:
+const express = require('express');
+const cors = require('cors');
+const bodyParser = require('body-parser');
+require('dotenv').config();
+
+const app = express();
+app.use(cors({ origin: '*' }));
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
+
+const twilioRoutes = require('./twilio'); // Matches filename twilio.js
+app.use('/api', twilioRoutes);
+
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on port ${PORT}`);
+});
