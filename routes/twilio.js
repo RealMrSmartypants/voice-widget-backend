@@ -3,16 +3,13 @@ const twilio = require('twilio');
 
 const router = express.Router();
 
-const AccessToken = twilio.jwt.AccessToken;
-const VoiceGrant = AccessToken.VoiceGrant;
-
 router.get('/twilio-token', (req, res) => {
   try {
     const requiredVars = [
       'TWILIO_ACCOUNT_SID',
-      'TWILIO_API_KEY',
-      'TWILIO_API_SECRET',
+      'TWILIO_AUTH_TOKEN',
       'TWIML_APP_SID',
+      'TWILIO_PHONE_NUMBER',
       'INBOUND_PHONE_NUMBER'
     ];
 
@@ -27,22 +24,23 @@ router.get('/twilio-token', (req, res) => {
 
     const identity = `user_${Date.now()}`;
 
-    const token = new AccessToken(
-      process.env.TWILIO_ACCOUNT_SID,
-      process.env.TWILIO_API_KEY,
-      process.env.TWILIO_API_SECRET,
-      { identity }
-    );
-
-    const voiceGrant = new VoiceGrant({
-      outgoingApplicationSid: process.env.TWIML_APP_SID,
-      incomingAllow: true
+    const capability = new twilio.jwt.ClientCapability({
+      accountSid: process.env.TWILIO_ACCOUNT_SID,
+      authToken: process.env.TWILIO_AUTH_TOKEN
     });
 
-    token.addGrant(voiceGrant);
+    capability.addOutgoingApplicationGrant(process.env.TWIML_APP_SID, {
+      params: {
+        To: process.env.INBOUND_PHONE_NUMBER
+      }
+    });
+
+    capability.addIncomingClientGrant(identity);
+
+    const token = capability.toJwt();
 
     res.json({
-      token: token.toJwt(),
+      token,
       identity
     });
   } catch (error) {
@@ -60,7 +58,13 @@ router.post('/twiml/handle-call', (req, res) => {
     const twiml = new twilio.twiml.VoiceResponse();
 
     twiml.say('Connecting you to Michelle.');
-    twiml.dial(process.env.INBOUND_PHONE_NUMBER);
+
+    const dial = twiml.dial({
+      timeout: 30,
+      record: 'record-from-answer'
+    });
+
+    dial.number(process.env.INBOUND_PHONE_NUMBER);
 
     res.type('text/xml');
     res.send(twiml.toString());
