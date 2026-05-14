@@ -24,18 +24,26 @@ router.get('/twilio-token', (req, res) => {
 
     const identity = `user_${Date.now()}`;
 
-    const capability = new twilio.jwt.ClientCapability({
+    const ClientCapability = twilio.jwt.ClientCapability;
+
+    const capability = new ClientCapability({
       accountSid: process.env.TWILIO_ACCOUNT_SID,
       authToken: process.env.TWILIO_AUTH_TOKEN
     });
 
-    capability.addOutgoingApplicationGrant(process.env.TWIML_APP_SID, {
-      params: {
-        To: process.env.INBOUND_PHONE_NUMBER
-      }
-    });
+    capability.addScope(
+      new ClientCapability.OutgoingClientScope({
+        applicationSid: process.env.TWIML_APP_SID,
+        clientName: identity,
+        params: {
+          To: process.env.INBOUND_PHONE_NUMBER
+        }
+      })
+    );
 
-    capability.addIncomingClientGrant(identity);
+    capability.addScope(
+      new ClientCapability.IncomingClientScope(identity)
+    );
 
     const token = capability.toJwt();
 
