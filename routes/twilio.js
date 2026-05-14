@@ -3,13 +3,16 @@ const twilio = require('twilio');
 
 const router = express.Router();
 
+const AccessToken = twilio.jwt.AccessToken;
+const VoiceGrant = AccessToken.VoiceGrant;
+
 router.get('/twilio-token', (req, res) => {
   try {
     const requiredVars = [
       'TWILIO_ACCOUNT_SID',
-      'TWILIO_AUTH_TOKEN',
+      'TWILIO_API_KEY',
+      'TWILIO_API_SECRET',
       'TWIML_APP_SID',
-      'TWILIO_PHONE_NUMBER',
       'INBOUND_PHONE_NUMBER'
     ];
 
@@ -24,31 +27,22 @@ router.get('/twilio-token', (req, res) => {
 
     const identity = `user_${Date.now()}`;
 
-    const ClientCapability = twilio.jwt.ClientCapability;
+    const token = new AccessToken(
+      process.env.TWILIO_ACCOUNT_SID,
+      process.env.TWILIO_API_KEY,
+      process.env.TWILIO_API_SECRET,
+      { identity }
+    );
 
-    const capability = new ClientCapability({
-      accountSid: process.env.TWILIO_ACCOUNT_SID,
-      authToken: process.env.TWILIO_AUTH_TOKEN
+    const voiceGrant = new VoiceGrant({
+      outgoingApplicationSid: process.env.TWIML_APP_SID,
+      incomingAllow: true
     });
 
-    capability.addScope(
-      new ClientCapability.OutgoingClientScope({
-        applicationSid: process.env.TWIML_APP_SID,
-        clientName: identity,
-        params: {
-          To: process.env.INBOUND_PHONE_NUMBER
-        }
-      })
-    );
-
-    capability.addScope(
-      new ClientCapability.IncomingClientScope(identity)
-    );
-
-    const token = capability.toJwt();
+    token.addGrant(voiceGrant);
 
     res.json({
-      token,
+      token: token.toJwt(),
       identity
     });
   } catch (error) {
