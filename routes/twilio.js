@@ -28,10 +28,7 @@ router.get('/twilio-token', (req, res) => {
 router.post('/twiml/handle-call', (req, res) => {
   const twiml = new twilio.twiml.VoiceResponse();
   const dial = twiml.dial({ callerId: process.env.TWILIO_PHONE_NUMBER });
-  dial.client({
-    identity: process.env.SIMPLETALK_AGENT_ID,
-    statusCallbackEvent: 'initiated ringing answered completed',
-  }, process.env.SIMPLETALK_CLIENT_ID);
+  dial.client(process.env.SIMPLETALK_CLIENT_ID);
   res.type('text/xml');
   res.send(twiml.toString());
 });
