@@ -27,8 +27,8 @@ router.get('/twilio-token', (req, res) => {
 
 router.post('/twiml/handle-call', (req, res) => {
   const twiml = new twilio.twiml.VoiceResponse();
-  twiml.say('Connecting you to Michelle.');
-  twiml.dial(process.env.INBOUND_PHONE_NUMBER);
+  const dial = twiml.dial({ callerId: process.env.TWILIO_PHONE_NUMBER });
+  dial.number(process.env.INBOUND_PHONE_NUMBER);
   res.type('text/xml');
   res.send(twiml.toString());
 });
