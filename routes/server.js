@@ -24,7 +24,6 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-// Auto-download Twilio SDK on startup if not present
 const publicDir = path.join(__dirname, '..', 'public');
 const sdkPath = path.join(publicDir, 'twilio.min.js');
 
